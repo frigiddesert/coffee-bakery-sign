@@ -42,7 +42,7 @@ GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "").strip()
 ALLOWED_SENDERS = [
     x.strip().lower() for x in os.getenv("ALLOWED_SENDERS", "").split(",") if x.strip()
 ]
-EMAIL_SUBJECT_TRIGGER = os.getenv("EMAIL_SUBJECT_TRIGGER", "BAKEPLAN").strip()
+EMAIL_SUBJECT_TRIGGER = os.getenv("EMAIL_SUBJECT_TRIGGER", "").strip()
 EMAIL_SUBJECT_PASSCODE = os.getenv("EMAIL_SUBJECT_PASSCODE", "").strip()
 
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "").strip()

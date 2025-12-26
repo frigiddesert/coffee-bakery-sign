@@ -1,0 +1,39 @@
+# Environment variables (secrets)
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# QR codes (regenerate as needed)
+*.png
+qr_*.png
+mailto_qr.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test images
+*.jpg
+*.jpeg
+*.heic
+Image_*

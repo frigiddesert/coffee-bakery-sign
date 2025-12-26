@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: village-roaster-sign
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: APP_TZ
+        value: America/Denver
+      - key: RESET_HOUR
+        value: 6
+      - key: SHIFT_START_HOUR
+        value: 7
+      - key: SHIFT_END_HOUR
+        value: 15
+      - key: STATE_POLL_SECONDS
+        value: 10
+      - key: EMAIL_POLL_SECONDS
+        value: 60
+      - key: ROASTS_MAX
+        value: 30
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: ALLOWED_SENDERS
+        sync: false
+      - key: EMAIL_SUBJECT_TRIGGER
+        value: ""
+      - key: EMAIL_SUBJECT_PASSCODE
+        value: ""
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MENU_ITEMS
+        sync: false

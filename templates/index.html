@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Village Roaster Display</title>
 
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Raleway:wght@400;500;600;700;800;900&display=swap" />
 
   <style>
     :root{
@@ -53,8 +53,9 @@
     }
 
     .current{
+      font-family: "Raleway", sans-serif;
       font-weight: 900;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.01em;
       line-height: 1.02;
       font-size: clamp(68px, 7.75vw, 150px);
       margin-bottom: 2.8vw;
@@ -80,11 +81,13 @@
     }
 
     .bake-now-list{
-      font-weight: 700;
+      font-family: "Raleway", sans-serif;
+      font-weight: 800;
       font-size: clamp(36px, 4.2vw, 72px);
       line-height: 1.25;
       margin-bottom: 2.5vw;
       margin-top: 1.5vw;
+      letter-spacing: -0.01em;
     }
 
     .bake-now-list div{
@@ -92,20 +95,24 @@
     }
 
     .coming-soon{
-      font-weight: 500;
+      font-family: "Raleway", sans-serif;
+      font-weight: 600;
       font-size: clamp(28px, 3.2vw, 56px);
       color: var(--muted2);
       opacity: 0.75;
       line-height: 1.35;
       margin-top: 1vw;
+      letter-spacing: -0.005em;
     }
 
     .roast-previous{
-      font-weight: 600;
+      font-family: "Raleway", sans-serif;
+      font-weight: 700;
       font-size: clamp(32px, 3.8vw, 68px);
       color: var(--muted);
       line-height: 1.3;
       margin-top: 1.5vw;
+      letter-spacing: -0.01em;
     }
 
     .roast-previous div{

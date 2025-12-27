@@ -444,6 +444,7 @@ def email_loop():
                     state["bake_items"] = plan[:200]
                     state["bake_source"] = ""
                     state["updated_at"] = iso()
+                logger.info("✓ State updated with %d bake items at %s", len(plan), state["updated_at"])
 
         except Exception:
             logger.exception("Background email loop crashed")

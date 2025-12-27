@@ -506,6 +506,30 @@ def api_roast():
     return jsonify({"ok": True})
 
 
+@app.route("/api/bake", methods=["POST"])
+def api_bake():
+    ensure_daily_reset()
+    data = request.get_json(silent=True) or {}
+    items = data.get("items", [])
+
+    if not isinstance(items, list):
+        return jsonify({"ok": False, "error": "items must be a list"}), 400
+
+    # Clean and validate items
+    clean_items = [str(x).strip() for x in items if str(x).strip()]
+
+    if not clean_items:
+        return jsonify({"ok": False, "error": "no valid items provided"}), 400
+
+    with lock:
+        state["date"] = today_key()
+        state["bake_items"] = clean_items[:200]  # Limit to 200 items
+        state["bake_source"] = data.get("source", "API")
+        state["updated_at"] = iso()
+
+    return jsonify({"ok": True, "count": len(clean_items)})
+
+
 @app.route("/health")
 def health():
     return "ok", 200

@@ -464,6 +464,8 @@ def index():
 def api_state():
     ensure_daily_reset()
     with lock:
+        logger.info("API /state called - bake_items count: %d, updated_at: %s",
+                   len(state.get("bake_items", [])), state.get("updated_at"))
         bake_window = compute_bake_window(state["bake_items"])
         return jsonify(
             {
@@ -504,6 +506,18 @@ def api_roast():
 @app.route("/health")
 def health():
     return "ok", 200
+
+
+@app.route("/api/debug")
+def api_debug():
+    with lock:
+        debug_info = {
+            "raw_state": dict(state),
+            "state_id": id(state),
+            "lock_id": id(lock),
+        }
+    logger.info("DEBUG: State dump: %s", debug_info)
+    return jsonify(debug_info)
 
 
 if __name__ == "__main__":

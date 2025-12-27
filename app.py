@@ -82,7 +82,10 @@ def ensure_daily_reset():
     with lock:
         local = now_local()
         tkey = today_key(local)
+        logger.info("ensure_daily_reset: state[date]=%s, today=%s, hour=%d, reset_hour=%d",
+                   state["date"], tkey, local.hour, RESET_HOUR)
         if state["date"] != tkey and local.hour >= RESET_HOUR:
+            logger.warning("RESETTING STATE! Old date: %s, New date: %s", state["date"], tkey)
             state.update(
                 {
                     "date": tkey,

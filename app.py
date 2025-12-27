@@ -336,6 +336,7 @@ def imap_fetch_latest_matching_attachment():
     M.login(GMAIL_USER, GMAIL_APP_PASSWORD)
     M.select("INBOX")
 
+    # First try UNSEEN messages
     typ, data = M.search(None, "(UNSEEN)")
     if typ != "OK":
         logger.warning("IMAP search failed (%s)", typ)
@@ -344,6 +345,24 @@ def imap_fetch_latest_matching_attachment():
 
     ids = data[0].split()
     logger.info("Found %d unseen messages", len(ids))
+
+    # If no unseen messages, check last 10 messages anyway (in case they were marked read)
+    if not ids:
+        logger.info("No unseen messages, checking last 10 messages regardless of read status...")
+        typ, data = M.search(None, "ALL")
+        if typ == "OK" and data[0]:
+            all_ids = data[0].split()
+            # Check if we've already processed the last message
+            if all_ids and mail_state.get("last_uid"):
+                last_uid = mail_state["last_uid"]
+                # Only check messages after the last processed one
+                ids = [mid for mid in all_ids if int(mid) > int(last_uid)]
+                logger.info("Found %d new messages since last check (UID %s)", len(ids), last_uid)
+            else:
+                # First run, just check last 10
+                ids = all_ids[-10:]
+                logger.info("First run, checking last %d messages", len(ids))
+
     if not ids:
         M.logout()
         return None, None
@@ -396,6 +415,11 @@ def imap_fetch_latest_matching_attachment():
 
         logger.info("Found matching email %s, running OCR", msg_ref)
         M.store(msg_ref, "+FLAGS", "\\Seen")
+
+        # Save the UID so we don't reprocess
+        mail_state["last_uid"] = msg_id
+        logger.info("Saved last processed UID: %s", msg_id)
+
         M.logout()
         return prepared_image, {
             "from": from_h,

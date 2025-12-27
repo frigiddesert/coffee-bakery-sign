@@ -2,6 +2,9 @@
 .env
 .env.local
 
+# Runtime state (persisted locally, not in git)
+state.json
+
 # Python
 __pycache__/
 *.py[cod]

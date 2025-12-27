@@ -53,6 +53,8 @@ ROASTS_MAX = int(os.getenv("ROASTS_MAX", "30"))
 app = Flask(__name__)
 lock = threading.Lock()
 
+STATE_FILE = os.path.join(os.path.dirname(__file__), "state.json")
+
 state = {
     "date": None,
     "roast_current": "",
@@ -62,6 +64,38 @@ state = {
     "updated_at": None,
 }
 mail_state = {"last_uid": None}
+
+
+def load_state():
+    """Load state from JSON file if it exists"""
+    global state, mail_state
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if "state" in data:
+                state.update(data["state"])
+                logger.info("Loaded state from %s: %d bake items, %d roasts",
+                           STATE_FILE, len(state.get("bake_items", [])), len(state.get("roasts_today", [])))
+            if "mail_state" in data:
+                mail_state.update(data["mail_state"])
+                logger.info("Loaded mail state: last_uid=%s", mail_state.get("last_uid"))
+        except Exception:
+            logger.exception("Failed to load state from %s", STATE_FILE)
+
+
+def save_state():
+    """Save state to JSON file"""
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump({"state": state, "mail_state": mail_state}, f, indent=2)
+        logger.debug("Saved state to %s", STATE_FILE)
+    except Exception:
+        logger.exception("Failed to save state to %s", STATE_FILE)
+
+
+# Load state on startup
+load_state()
 
 
 def now_local():
@@ -96,6 +130,7 @@ def ensure_daily_reset():
                     "updated_at": iso(local),
                 }
             )
+            save_state()
 
 
 def load_menu_items():
@@ -471,6 +506,7 @@ def email_loop():
                     state["bake_items"] = plan[:200]
                     state["bake_source"] = ""
                     state["updated_at"] = iso()
+                    save_state()
                 logger.info("✓ State updated with %d bake items at %s", len(plan), state["updated_at"])
 
         except Exception:
@@ -526,6 +562,7 @@ def api_roast():
             state["roasts_today"].append(item)
             state["roasts_today"] = state["roasts_today"][-ROASTS_MAX:]
         state["updated_at"] = iso()
+        save_state()
 
     return jsonify({"ok": True})
 
@@ -550,6 +587,7 @@ def api_bake():
         state["bake_items"] = clean_items[:200]  # Limit to 200 items
         state["bake_source"] = data.get("source", "API")
         state["updated_at"] = iso()
+        save_state()
 
     return jsonify({"ok": True, "count": len(clean_items)})
 

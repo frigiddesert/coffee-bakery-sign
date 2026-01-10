@@ -1,39 +1,213 @@
 # Village Roaster Kiosk
 
-Tiny Render deploy: a single Python web service that powers the TV display.
+Digital signage system for Village Roaster coffee shop, powered by **Cloudflare Workers**.
 
-## Structure
-- `app.py` – Flask app + background Gmail IMAP worker that OCRs the latest whiteboard photo via Mistral, fuzzy-matches against the menu, and keeps in-memory roast/bake state.
-- `templates/index.html` – Playfair Display-powered display that polls `/api/state` and renders the roasted coffee + baking plan with gentle scrolling.
-- `generate_mailto_qr.py` – helper that produces a QR code which opens a pre-filled BAKEPLAN email (TO + subject passcode) for kitchen staff.
-- `requirements.txt` – pinned dependencies for Flask, Gunicorn, Dotenv, Mistral, OCR image helpers, and QR generation.
-- `.env.example` – environment variables for timezone, Gmail App Password, allowed senders/passcodes, and Mistral credentials.
+## Overview
 
-## Deploy
-1. Copy `.env.example` to `.env` with your real secrets (see “Email authentication” below).
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Run locally via `python app.py`, or in Render use `gunicorn app:app`.
-4. Point the kiosk browser at the deployed URL. No manual refresh needed; it polls every ~10 seconds.
-5. Optional QR roast updates: hit `/api/roast?item=Item%20Name` or send a POST JSON with `{"item":"Item Name"}` to update the roasting column.
+This system displays:
+- **Current roast** - What coffee is being roasted right now
+- **Today's roasts** - All coffees roasted today
+- **Baking plan** - Items being baked (from whiteboard photo OCR)
 
-## Email authentication (subject passcode)
-- `EMAIL_SUBJECT_TRIGGER` defaults to `BAKEPLAN`.
-- `EMAIL_SUBJECT_PASSCODE` enforces an 8-character token (e.g. `BAKE2025`). A subject must contain **both** the trigger and the passcode to be processed. Rotate this code anytime and regenerate the QR sign.
-- `ALLOWED_SENDERS` can be left blank to accept any sender. Keep it populated if you want an additional allowlist.
+Staff can update the display by:
+- Scanning QR codes (updates roasts instantly)
+- Sending whiteboard photos via email (OCR extracts baking plan)
 
-## Kitchen QR workflow
-Generate a QR that opens the staffer’s default mail client with the proper TO + subject string:
+## Architecture
+
+**Platform**: Cloudflare Workers (TypeScript)
+**State Storage**: Cloudflare KV (persistent, globally distributed)
+**OCR**: Mistral AI Vision API (pixtral-large-latest)
+**Fuzzy Matching**: fuzzball (JavaScript port of Python's fuzzywuzzy)
+**Email Polling**: Cron Triggers (every 60 seconds)
+
+## Quick Start
+
+### 1. Install Dependencies
 ```bash
-python generate_mailto_qr.py --email bakingatvillageroaster.z6mbz32@gmail.com --subject "BAKEPLAN BAKE2025" --output mailto_qr.png
+npm install
 ```
-Print the resulting `mailto_qr.png` and post it near the whiteboard. Update the subject argument whenever you rotate the passcode.
 
-## Local OCR sanity check
-Before testing Gmail, confirm the Mistral pipeline works with a local photo:
+### 2. Set Up Secrets
 ```bash
-python ocr_local_test.py path/to/whiteboard.jpg
+npx wrangler secret put GMAIL_USER
+npx wrangler secret put GMAIL_APP_PASSWORD
+npx wrangler secret put MISTRAL_API_KEY
+npx wrangler secret put ALLOWED_SENDERS
+npx wrangler secret put MENU_ITEMS
 ```
-Pass `--api-key` if the `MISTRAL_API_KEY` env var isn’t exported.
+
+### 3. Deploy
+```bash
+npm run deploy
+```
+
+You'll get a URL like: `https://village-roaster-sign.your-subdomain.workers.dev`
+
+## Configuration
+
+Edit `wrangler.toml`:
+
+```toml
+[vars]
+APP_TZ = "America/Denver"          # Timezone for daily resets
+RESET_HOUR = "6"                    # Reset state at 6 AM
+SHIFT_START_HOUR = "7"              # Baking shift starts
+SHIFT_END_HOUR = "15"               # Baking shift ends
+STATE_POLL_SECONDS = "10"           # Display refresh rate
+EMAIL_POLL_SECONDS = "60"           # Email check frequency
+ROASTS_MAX = "30"                   # Max roasts to track per day
+EMAIL_SUBJECT_TRIGGER = "BAKEPLAN"  # Email subject must contain this
+EMAIL_SUBJECT_PASSCODE = "BAKE2025" # And this passcode
+```
+
+## API Endpoints
+
+### `GET /`
+Display page (auto-refreshes every 10 seconds)
+
+### `GET /api/state`
+Returns current state:
+```json
+{
+  "date": "2026-01-10",
+  "roast_current": "Honduras",
+  "roasts_today": ["Ethiopia", "Honduras"],
+  "bake_items": ["Croissants", "Sourdough", "Focaccia"],
+  "bake_current_index": 0,
+  "updated_at": "2026-01-10T14:23:45.123Z"
+}
+```
+
+### `GET/POST /api/roast?item=ItemName`
+Update current roast (via QR code scan)
+
+### `POST /api/bake`
+Update baking items:
+```json
+{
+  "items": ["Croissants", "Sourdough", "Focaccia"],
+  "source": "Manual"
+}
+```
+
+### `GET /health`
+Health check endpoint
+
+## Development
+
+### Run Locally
+```bash
+npm run dev
+# Access at http://localhost:8787
+```
+
+### View Logs
+```bash
+npm run tail
+```
+
+### Deploy
+```bash
+npm run deploy
+```
+
+## Generating QR Codes
+
+Use the Python scripts in `python-legacy/`:
+
+```bash
+python python-legacy/generate_roast_qr.py \
+  --base-url https://your-worker.workers.dev \
+  --roast "Honduras" \
+  --output qr_honduras.png
+```
+
+Print and post QR codes near roasting station. Staff scans to update display instantly.
+
+## Email Integration
+
+The email polling cron is implemented but requires IMAP/Gmail API setup:
+
+**Current Status**: Placeholder implementation
+**Options**:
+1. Gmail API with OAuth2 (recommended for Workers)
+2. Email webhook service (Cloudflare Email Routing, SendGrid)
+3. IMAP proxy service
+
+See `CLOUDFLARE_DEPLOYMENT.md` for implementation options.
+
+## File Structure
+
+```
+coffee-bakery-sign/
+├── src/
+│   ├── index.ts      # Main Worker (HTTP + cron handlers)
+│   ├── state.ts      # KV state management
+│   ├── fuzzy.ts      # Fuzzy matching logic
+│   ├── ocr.ts        # Mistral OCR integration
+│   ├── email.ts      # Email processing (placeholder)
+│   └── types.ts      # TypeScript interfaces
+├── python-legacy/    # Original Python/Flask implementation
+├── wrangler.toml     # Cloudflare Workers configuration
+├── package.json      # Node.js dependencies
+└── tsconfig.json     # TypeScript configuration
+```
+
+## Migration from Python
+
+This project was migrated from Python/Flask on Render to TypeScript on Cloudflare Workers.
+
+**Why migrate?**
+- Persistent state storage (KV vs ephemeral filesystem)
+- Global CDN distribution (sub-50ms worldwide)
+- Better scaling and reliability
+- Lower cost (free tier: 100k requests/day)
+
+Original Python code is preserved in `python-legacy/` directory.
+
+See `CLOUDFLARE_DEPLOYMENT.md` for detailed migration guide.
+
+## Monitoring
+
+- **Dashboard**: https://dash.cloudflare.com → Workers & Pages → village-roaster-sign
+- **Real-time logs**: `npm run tail`
+- **Analytics**: Cloudflare dashboard shows request volume, errors, latency
+
+## Troubleshooting
+
+**Display not updating?**
+- Check `/api/state` endpoint returns valid JSON
+- Verify browser can reach Worker URL
+- Check browser console for errors
+
+**Roast updates not working?**
+- Test endpoint: `curl "https://your-worker.workers.dev/api/roast?item=Test"`
+- Check logs: `npm run tail`
+
+**Cron not running?**
+- View dashboard → Triggers section
+- Check logs for "Cron triggered:" messages
+
+## Cost
+
+**Free Tier**:
+- 100,000 requests/day
+- Unlimited KV reads (10,000 writes/day)
+
+**Expected Usage**:
+- ~10,000 requests/day (display + QR scans + cron)
+- Well within free tier limits
+
+## License
+
+ISC
+
+## Support
+
+For Cloudflare Workers questions:
+- Docs: https://developers.cloudflare.com/workers/
+- Discord: https://discord.gg/cloudflaredev
+
+For project-specific issues:
+- GitHub: https://github.com/frigiddesert/coffee-bakery-sign/issues

@@ -1,0 +1,290 @@
+import { Env } from './types';
+import {
+  loadState,
+  saveState,
+  ensureDailyReset,
+  todayKey,
+  iso,
+  computeBakeWindow,
+} from './state';
+import { splitCandidateLines, fuzzyMatchToMenu, loadMenuItems } from './fuzzy';
+import { mistralOcrImageBytes, normalizeImageBytes } from './ocr';
+import { processEmails } from './email';
+
+// HTML template for the display
+const HTML_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Village Roaster Display</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Raleway:wght@400;500;600;700;800;900&display=swap" />
+  <style>
+    :root{--bg: #2B1712;--fg: #F4F1EA;--muted: rgba(244,241,234,.82);--muted2: rgba(244,241,234,.66);}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {width: 100%;height: 100%;background: var(--bg);color: var(--fg);overflow: hidden;font-family: "Playfair Display", serif;}
+    .wrap{width: 100vw;height: 100vh;padding: 4vw;display: grid;grid-template-columns: 1fr 1fr;gap: 6vw;}
+    .col{display: flex;flex-direction: column;min-width: 0;padding: 0 2vw;}
+    .title{font-weight: 700;letter-spacing: -0.02em;line-height: 1.05;font-size: clamp(53px, 6.24vw, 110px);margin-bottom: 1.5vw;padding-bottom: 1.5vw;border-bottom: 2px solid rgba(244,241,234,.35);}
+    .current{font-family: "Raleway", sans-serif;font-weight: 900;letter-spacing: -0.01em;line-height: 1.02;font-size: clamp(82px, 9.3vw, 180px);margin-bottom: 2.8vw;margin-top: 1.5vw;word-break: break-word;hyphens: auto;}
+    .subline{font-weight: 600;font-size: clamp(29px, 3.12vw, 53px);color: var(--muted2);margin-top: 2.5vw;margin-bottom: 1.2vw;}
+    .bake-now-list{font-family: "Raleway", sans-serif;font-weight: 800;font-size: clamp(43px, 5.04vw, 86px);line-height: 1.25;margin-bottom: 2.5vw;margin-top: 1.5vw;letter-spacing: -0.01em;}
+    .bake-now-list div{margin-bottom: 0.8vw;}
+    .coming-soon{font-family: "Raleway", sans-serif;font-weight: 600;font-size: clamp(34px, 3.84vw, 67px);color: var(--muted2);opacity: 0.75;line-height: 1.35;margin-top: 1vw;letter-spacing: -0.005em;}
+    .roast-previous{font-family: "Raleway", sans-serif;font-weight: 700;font-size: clamp(38px, 4.56vw, 82px);color: var(--muted);line-height: 1.3;margin-top: 1.5vw;letter-spacing: -0.01em;}
+    .roast-previous div{margin-bottom: 0.8vw;}
+    .divider{position: absolute;left: 50%;top: 5vw;bottom: 5vw;width: 2px;background: rgba(244,241,234,.35);transform: translateX(-2.5vw);pointer-events: none;display: none;}
+    @media (min-width: 900px){.divider{ display: block; }}
+    @media (max-width: 900px){.wrap{grid-template-columns: 1fr;gap: 6vw;}.divider{ display: none; }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="col">
+      <div class="title">Roasting Now:</div>
+      <div class="current" id="roastCurrent">—</div>
+      <div class="roast-previous" id="roastPrevious"></div>
+    </div>
+    <div class="col">
+      <div class="title">Baking Now:</div>
+      <div class="bake-now-list" id="bakeNow">—</div>
+      <div class="subline">Coming Up Soon:</div>
+      <div class="coming-soon" id="bakeSoon">—</div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <script>
+    const POLL_SECONDS = {{POLL_SECONDS}} || 10;
+    function esc(s){return (s ?? "").toString().replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");}
+    async function tick(){
+      try{
+        const r = await fetch("/api/state", { cache: "no-store" });
+        const s = await r.json();
+        document.getElementById("roastCurrent").textContent = s.roast_current || "—";
+        const prevRoasts = s.roasts_today || [];
+        const prevEl = document.getElementById("roastPrevious");
+        if (prevRoasts.length > 0) {
+          prevEl.innerHTML = prevRoasts.map(esc).map(r => \`<div>\${r}</div>\`).join('');
+        } else {
+          prevEl.innerHTML = "";
+        }
+        const bakeItems = s.bake_items || [];
+        const nowEl = document.getElementById("bakeNow");
+        const soonEl = document.getElementById("bakeSoon");
+        if (bakeItems.length === 0) {
+          nowEl.textContent = "—";
+          soonEl.textContent = "—";
+        } else {
+          const first3 = bakeItems.slice(0, 3).map(esc);
+          nowEl.innerHTML = first3.map(item => \`<div>\${item}</div>\`).join('');
+          const rest = bakeItems.slice(3).map(esc);
+          if (rest.length > 0) {
+            soonEl.textContent = rest.join(", ");
+          } else {
+            soonEl.textContent = "—";
+          }
+        }
+      }catch(_e){}
+    }
+    tick();
+    setInterval(tick, Math.max(5, POLL_SECONDS) * 1000);
+  </script>
+</body>
+</html>`;
+
+// Main Worker export
+export default {
+  // HTTP request handler
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Serve homepage
+    if (url.pathname === '/') {
+      const html = HTML_TEMPLATE.replace(
+        '{{POLL_SECONDS}}',
+        env.STATE_POLL_SECONDS || '10'
+      );
+      return new Response(html, {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
+    // Health check
+    if (url.pathname === '/health') {
+      return new Response('ok', { status: 200 });
+    }
+
+    // API: Get current state
+    if (url.pathname === '/api/state') {
+      await ensureDailyReset(env);
+      const state = await loadState(env.KV);
+      const bakeCurrentIndex = computeBakeWindow(state.bake_items, env);
+
+      return new Response(
+        JSON.stringify({
+          date: state.date,
+          roast_current: state.roast_current,
+          roasts_today: state.roasts_today,
+          bake_items: state.bake_items,
+          bake_current_index: bakeCurrentIndex,
+          updated_at: state.updated_at,
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // API: Update roast
+    if (url.pathname === '/api/roast') {
+      await ensureDailyReset(env);
+
+      let item = '';
+      if (request.method === 'GET') {
+        item = url.searchParams.get('item') || '';
+      } else if (request.method === 'POST') {
+        try {
+          const body = await request.json();
+          item = (body as any).item || '';
+        } catch (e) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Invalid JSON' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
+        return new Response('Method not allowed', { status: 405 });
+      }
+
+      item = item.trim();
+      if (!item) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'missing item' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const state = await loadState(env.KV);
+      state.date = todayKey(env.APP_TZ);
+      state.roast_current = item;
+
+      if (
+        state.roasts_today.length === 0 ||
+        state.roasts_today[state.roasts_today.length - 1] !== item
+      ) {
+        state.roasts_today.push(item);
+        const maxRoasts = parseInt(env.ROASTS_MAX || '30', 10);
+        state.roasts_today = state.roasts_today.slice(-maxRoasts);
+      }
+
+      state.updated_at = iso();
+      await saveState(env.KV, state);
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // API: Update bake items
+    if (url.pathname === '/api/bake' && request.method === 'POST') {
+      await ensureDailyReset(env);
+
+      let body: any;
+      try {
+        body = await request.json();
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Invalid JSON' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const items = body.items;
+      if (!Array.isArray(items)) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'items must be a list' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const cleanItems = items
+        .map((x) => String(x).trim())
+        .filter((x) => x)
+        .slice(0, 200);
+
+      if (cleanItems.length === 0) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'no valid items provided' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const state = await loadState(env.KV);
+      state.date = todayKey(env.APP_TZ);
+      state.bake_items = cleanItems;
+      state.bake_source = body.source || 'API';
+      state.updated_at = iso();
+      await saveState(env.KV, state);
+
+      return new Response(
+        JSON.stringify({ ok: true, count: cleanItems.length }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // API: Debug endpoint
+    if (url.pathname === '/api/debug') {
+      const state = await loadState(env.KV);
+      return new Response(JSON.stringify({ state }, null, 2), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response('Not found', { status: 404 });
+  },
+
+  // Scheduled (cron) handler for email polling
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    console.log('Cron triggered:', new Date().toISOString());
+
+    try {
+      await ensureDailyReset(env);
+
+      // Process emails
+      const imageBytes = await processEmails(env);
+      if (!imageBytes) {
+        console.log('No new emails with matching criteria');
+        return;
+      }
+
+      console.log('Processing email image...');
+
+      // Run OCR
+      const ocrText = await mistralOcrImageBytes(imageBytes, env.MISTRAL_API_KEY);
+      if (!ocrText.trim()) {
+        console.warn('OCR returned empty text');
+        return;
+      }
+
+      // Extract and match items
+      const candidates = splitCandidateLines(ocrText);
+      console.log(`OCR extracted ${candidates.length} candidates`);
+
+      const menu = loadMenuItems(env.MENU_ITEMS);
+      const plan = fuzzyMatchToMenu(candidates, menu);
+      console.log(`Matched ${plan.length} items to menu`);
+
+      // Update state
+      const state = await loadState(env.KV);
+      state.date = todayKey(env.APP_TZ);
+      state.bake_items = plan.slice(0, 200);
+      state.bake_source = 'Email';
+      state.updated_at = iso();
+      await saveState(env.KV, state);
+
+      console.log(`✓ Updated bake items: ${plan.length} items`);
+    } catch (error) {
+      console.error('Cron job failed:', error);
+    }
+  },
+};

@@ -1,0 +1,33 @@
+name = "village-roaster-sign"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV namespace for state persistence
+[[kv_namespaces]]
+binding = "KV"
+id = "35352ae010ec4a6792aedc0d37a426b6"
+
+# Cron trigger for email polling (runs every minute)
+[triggers]
+crons = ["* * * * *"]  # Every minute
+
+# Environment variables (non-secret defaults)
+[vars]
+APP_TZ = "America/Denver"
+RESET_HOUR = "6"
+SHIFT_START_HOUR = "7"
+SHIFT_END_HOUR = "15"
+STATE_POLL_SECONDS = "10"
+EMAIL_POLL_SECONDS = "60"
+ROASTS_MAX = "30"
+EMAIL_SUBJECT_TRIGGER = "BAKEPLAN"
+EMAIL_SUBJECT_PASSCODE = "BAKE2025"
+
+# Secret variables (set with: wrangler secret put VARIABLE_NAME)
+# Run these commands after setup:
+# wrangler secret put GMAIL_USER
+# wrangler secret put GMAIL_APP_PASSWORD
+# wrangler secret put MISTRAL_API_KEY
+# wrangler secret put ALLOWED_SENDERS
+# wrangler secret put MENU_ITEMS

@@ -1,0 +1,32 @@
+{
+  "name": "coffee-bakery-sign",
+  "version": "2.0.0",
+  "description": "Village Roaster digital signage powered by Cloudflare Workers",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frigiddesert/coffee-bakery-sign.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/frigiddesert/coffee-bakery-sign/issues"
+  },
+  "homepage": "https://github.com/frigiddesert/coffee-bakery-sign#readme",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260109.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.58.0"
+  },
+  "dependencies": {
+    "emailjs-imap-client": "^3.1.0",
+    "fuzzball": "^2.2.3"
+  }
+}

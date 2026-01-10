@@ -40,3 +40,10 @@ Thumbs.db
 *.jpeg
 *.heic
 Image_*
+
+# Node.js / Workers
+node_modules/
+dist/
+.wrangler/
+worker-configuration.d.ts
+package-lock.json

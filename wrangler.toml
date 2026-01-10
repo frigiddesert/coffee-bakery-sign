@@ -8,9 +8,9 @@ compatibility_flags = ["nodejs_compat"]
 binding = "KV"
 id = "35352ae010ec4a6792aedc0d37a426b6"
 
-# Cron trigger for email polling (runs every minute)
+# Cron trigger for daily tasks (daily reset check)
 [triggers]
-crons = ["* * * * *"]  # Every minute
+crons = ["0 6 * * *"]  # Daily at 6 AM (Denver time)
 
 # Environment variables (non-secret defaults)
 [vars]

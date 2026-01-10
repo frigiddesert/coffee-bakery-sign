@@ -9,7 +9,7 @@ import {
 } from './state';
 import { splitCandidateLines, fuzzyMatchToMenu, loadMenuItems } from './fuzzy';
 import { mistralOcrImageBytes, normalizeImageBytes } from './ocr';
-import { processEmails } from './email';
+import { handleEmail } from './email-handler';
 
 // HTML template for the display
 const HTML_TEMPLATE = `<!DOCTYPE html>
@@ -243,48 +243,29 @@ export default {
     return new Response('Not found', { status: 404 });
   },
 
-  // Scheduled (cron) handler for email polling
+  // Scheduled (cron) handler - can be used for daily resets or other tasks
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     console.log('Cron triggered:', new Date().toISOString());
 
     try {
+      // Ensure daily reset happens
       await ensureDailyReset(env);
+      console.log('Daily reset check completed');
 
-      // Process emails
-      const imageBytes = await processEmails(env);
-      if (!imageBytes) {
-        console.log('No new emails with matching criteria');
-        return;
-      }
-
-      console.log('Processing email image...');
-
-      // Run OCR
-      const ocrText = await mistralOcrImageBytes(imageBytes, env.MISTRAL_API_KEY);
-      if (!ocrText.trim()) {
-        console.warn('OCR returned empty text');
-        return;
-      }
-
-      // Extract and match items
-      const candidates = splitCandidateLines(ocrText);
-      console.log(`OCR extracted ${candidates.length} candidates`);
-
-      const menu = loadMenuItems(env.MENU_ITEMS);
-      const plan = fuzzyMatchToMenu(candidates, menu);
-      console.log(`Matched ${plan.length} items to menu`);
-
-      // Update state
-      const state = await loadState(env.KV);
-      state.date = todayKey(env.APP_TZ);
-      state.bake_items = plan.slice(0, 200);
-      state.bake_source = 'Email';
-      state.updated_at = iso();
-      await saveState(env.KV, state);
-
-      console.log(`✓ Updated bake items: ${plan.length} items`);
+      // Email processing is now handled by Cloudflare Email Routing (email handler above)
+      // This cron can be used for other scheduled tasks if needed
     } catch (error) {
       console.error('Cron job failed:', error);
+    }
+  },
+
+  // Email handler for Cloudflare Email Routing
+  async email(message: any, env: Env, ctx: ExecutionContext) {
+    try {
+      await handleEmail(message, env);
+    } catch (error) {
+      console.error('Email handler failed:', error);
+      // Don't throw - we don't want to bounce emails on errors
     }
   },
 };

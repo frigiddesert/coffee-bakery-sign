@@ -1,8 +1,0 @@
-flask==3.0.0
-gunicorn==21.2.0
-python-dotenv==1.0.1
-mistralai>=1.10.0
-rapidfuzz==3.6.1
-Pillow>=10.0.0
-Pillow-Heif>=0.8.0
-qrcode[pil]>=7.4

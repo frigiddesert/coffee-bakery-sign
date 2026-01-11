@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Village Roaster QR Codes - Print Sheet</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 0.5in;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            background: white;
+        }
+
+        .page {
+            width: 8.5in;
+            height: 11in;
+            padding: 0.5in;
+            page-break-after: always;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: repeat(4, 1fr);
+            gap: 0;
+        }
+
+        .page:last-child {
+            page-break-after: auto;
+        }
+
+        .qr-card {
+            border: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25in;
+            text-align: center;
+        }
+
+        .coffee-name {
+            font-size: 24pt;
+            font-weight: bold;
+            margin-bottom: 0.15in;
+            line-height: 1.2;
+            color: #2B1712;
+        }
+
+        .qr-image {
+            width: 1.5in;
+            height: 1.5in;
+            object-fit: contain;
+        }
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .page {
+                margin: 0;
+            }
+        }
+
+        @media screen {
+            body {
+                background: #f0f0f0;
+                padding: 20px;
+            }
+
+            .page {
+                background: white;
+                margin: 0 auto 20px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="qr-card">
+        <div class="coffee-name">Brazil</div>
+        <img src="qr_codes/brazil.png" alt="Brazil" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Brazil Decaf</div>
+        <img src="qr_codes/brazil-decaf.png" alt="Brazil Decaf" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Brazil Mantiqueira de Minas</div>
+        <img src="qr_codes/brazil-mantiqueira.png" alt="Brazil Mantiqueira de Minas" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Burundi</div>
+        <img src="qr_codes/burundi.png" alt="Burundi" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Colombia</div>
+        <img src="qr_codes/colombia.png" alt="Colombia" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Colombia Decaf</div>
+        <img src="qr_codes/colombia-decaf.png" alt="Colombia Decaf" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Costa Rica</div>
+        <img src="qr_codes/costa-rica.png" alt="Costa Rica" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Dark Roast Decaf</div>
+        <img src="qr_codes/dark-roast-decaf.png" alt="Dark Roast Decaf" class="qr-image">
+    </div>
+</div>
+
+<div class="page">
+    <div class="qr-card">
+        <div class="coffee-name">Early Winter Blend</div>
+        <img src="qr_codes/early-winter-blend.png" alt="Early Winter Blend" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Ethiopia Decaf</div>
+        <img src="qr_codes/ethiopia-decaf.png" alt="Ethiopia Decaf" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Ethiopia Guji</div>
+        <img src="qr_codes/ethiopia-guji.png" alt="Ethiopia Guji" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">French Espresso Colombia</div>
+        <img src="qr_codes/french-espresso-colombia.png" alt="French Espresso Colombia" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">French Espresso Guatemala</div>
+        <img src="qr_codes/french-espresso-guatemala.png" alt="French Espresso Guatemala" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">French Espresso PNG</div>
+        <img src="qr_codes/french-espresso-png.png" alt="French Espresso PNG" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Guatemala</div>
+        <img src="qr_codes/guatemala.png" alt="Guatemala" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Honduras</div>
+        <img src="qr_codes/honduras.png" alt="Honduras" class="qr-image">
+    </div>
+</div>
+
+<div class="page">
+    <div class="qr-card">
+        <div class="coffee-name">Kenya AA</div>
+        <img src="qr_codes/kenya-aa.png" alt="Kenya AA" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Kona 100%</div>
+        <img src="qr_codes/kona-100.png" alt="Kona 100%" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Mexico</div>
+        <img src="qr_codes/mexico.png" alt="Mexico" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Mexico Decaf</div>
+        <img src="qr_codes/mexico-decaf.png" alt="Mexico Decaf" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Mocha Java</div>
+        <img src="qr_codes/mocha-java.png" alt="Mocha Java" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Nicaragua</div>
+        <img src="qr_codes/nicaragua.png" alt="Nicaragua" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">PNG</div>
+        <img src="qr_codes/png.png" alt="PNG" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Scandinavian Blend</div>
+        <img src="qr_codes/scandinavian-blend.png" alt="Scandinavian Blend" class="qr-image">
+    </div>
+</div>
+
+<div class="page">
+    <div class="qr-card">
+        <div class="coffee-name">Sulawesi</div>
+        <img src="qr_codes/sulawesi.png" alt="Sulawesi" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Sumatra</div>
+        <img src="qr_codes/sumatra.png" alt="Sumatra" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Sumatra Dark Roast</div>
+        <img src="qr_codes/sumatra-dark.png" alt="Sumatra Dark Roast" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Sumatra Decaf</div>
+        <img src="qr_codes/sumatra-decaf.png" alt="Sumatra Decaf" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Tanzania PB</div>
+        <img src="qr_codes/tanzania-pb.png" alt="Tanzania PB" class="qr-image">
+    </div>
+    <div class="qr-card">
+        <div class="coffee-name">Village Blend</div>
+        <img src="qr_codes/village.png" alt="Village Blend" class="qr-image">
+    </div>
+    <div class="qr-card"></div>
+    <div class="qr-card"></div>
+</div>
+
+</body>
+</html>

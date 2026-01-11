@@ -7,6 +7,7 @@ import {
   iso,
   computeBakeWindow,
   isDisplayMode,
+  getBakingDisplayMode,
 } from './state';
 import { splitCandidateLines, fuzzyMatchToMenu, loadMenuItems } from './fuzzy';
 import { mistralOcrImageBytes, normalizeImageBytes } from './ocr';
@@ -47,7 +48,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       <div class="roast-previous" id="roastPrevious"></div>
     </div>
     <div class="col">
-      <div class="title">Baking Now:</div>
+      <div class="title" id="bakeTitle">Baking Now:</div>
       <div class="bake-now-list" id="bakeNow">—</div>
       <div class="subline">Coming Up Soon:</div>
       <div class="coming-soon" id="bakeSoon">—</div>
@@ -90,18 +91,39 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             prevRoastsEl.innerHTML = "";
           }
         }
+
+        // Handle baking display mode
+        const bakingMode = s.baking_display_mode || 'baking';
+        const bakeTitleEl = document.getElementById("bakeTitle");
         const bakeItems = s.bake_items || [];
+        const bakeCurrentIndex = s.bake_current_index || 0;
         const nowEl = document.getElementById("bakeNow");
         const soonEl = document.getElementById("bakeSoon");
+
+        // Set title based on baking mode
+        if (bakingMode === 'fresh_baked') {
+          bakeTitleEl.textContent = "Fresh Baked:";
+        } else if (bakingMode === 'baked_today') {
+          bakeTitleEl.textContent = "Baked Today:";
+        } else {
+          bakeTitleEl.textContent = "Baking Now:";
+        }
+
         if (bakeItems.length === 0) {
           nowEl.textContent = "—";
           soonEl.textContent = "—";
         } else {
-          const first3 = bakeItems.slice(0, 3).map(esc);
-          nowEl.innerHTML = first3.map(item => \`<div>\${item}</div>\`).join('');
-          const rest = bakeItems.slice(3).map(esc);
-          if (rest.length > 0) {
-            soonEl.textContent = rest.join(", ");
+          // Use bake_current_index to pace items through the shift
+          const currentItems = bakeItems.slice(bakeCurrentIndex, bakeCurrentIndex + 3).map(esc);
+          if (currentItems.length > 0) {
+            nowEl.innerHTML = currentItems.map(item => \`<div>\${item}</div>\`).join('');
+          } else {
+            nowEl.textContent = "—";
+          }
+
+          const remainingItems = bakeItems.slice(bakeCurrentIndex + 3).map(esc);
+          if (remainingItems.length > 0) {
+            soonEl.textContent = remainingItems.join(", ");
           } else {
             soonEl.textContent = "—";
           }
@@ -142,6 +164,7 @@ export default {
       const state = await loadState(env.KV);
       const bakeCurrentIndex = computeBakeWindow(state.bake_items, env);
       const displayMode = isDisplayMode(state, env.APP_TZ);
+      const bakingDisplayMode = getBakingDisplayMode(state, env.APP_TZ);
 
       return new Response(
         JSON.stringify({
@@ -152,6 +175,7 @@ export default {
           bake_current_index: bakeCurrentIndex,
           updated_at: state.updated_at,
           display_mode: displayMode, // true = "Fresh Roasted", false = "Roasting Now"
+          baking_display_mode: bakingDisplayMode, // "baking" | "baked_today" | "fresh_baked"
         }),
         {
           headers: { 'Content-Type': 'application/json' },
@@ -249,6 +273,7 @@ export default {
       state.bake_items = cleanItems;
       state.bake_source = body.source || 'API';
       state.updated_at = iso();
+      state.last_bake_time = iso(); // Track when bake items were updated
       await saveState(env.KV, state);
 
       return new Response(

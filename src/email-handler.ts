@@ -2,35 +2,10 @@ import { Env } from './types';
 import { loadState, saveState, todayKey, iso } from './state';
 import { splitCandidateLines, fuzzyMatchToMenu, loadMenuItems } from './fuzzy';
 import { mistralOcrImageBytes } from './ocr';
+import PostalMime from 'postal-mime';
 
 // Email Worker handler for Cloudflare Email Routing
 // This handles incoming emails sent via Cloudflare Email Routing
-
-interface EmailAttachment {
-  filename: string;
-  mimeType: string;
-  content: ArrayBuffer;
-}
-
-// Parse email message and extract attachments
-async function parseEmailMessage(message: any): Promise<{
-  from: string;
-  subject: string;
-  attachments: EmailAttachment[];
-}> {
-  const from = message.from || '';
-  const subject = message.headers.get('subject') || '';
-  const attachments: EmailAttachment[] = [];
-
-  // Cloudflare Email Messages have a structured format
-  // We need to iterate through parts to find images
-  const rawEmail = await new Response(message.raw).text();
-
-  // For simplicity with Cloudflare Email Routing, we'll use the structured API
-  // The message object provides access to attachments
-
-  return { from, subject, attachments };
-}
 
 // Check if sender is allowed
 function senderAllowed(fromHeader: string, allowedSenders: string): boolean {
@@ -42,27 +17,37 @@ function senderAllowed(fromHeader: string, allowedSenders: string): boolean {
   return allowed.some((a) => from.includes(a));
 }
 
-// Check if subject matches trigger and passcode
+// Check if subject matches baking-related keywords
 function subjectMatches(subject: string, env: Env): boolean {
-  const normalized = subject.toUpperCase();
-  const trigger = env.EMAIL_SUBJECT_TRIGGER.toUpperCase();
-  const passcode = env.EMAIL_SUBJECT_PASSCODE.toUpperCase();
+  const normalized = subject.toLowerCase();
 
-  if (trigger && !normalized.includes(trigger)) return false;
-  if (passcode && !normalized.includes(passcode)) return false;
+  // Recognize any of these variations (case-insensitive)
+  const keywords = ['bakeplan', 'bake plan', 'baking plan', 'baking'];
 
-  return true;
+  return keywords.some(keyword => normalized.includes(keyword));
 }
 
 // Main email handler for Cloudflare Email Routing
 export async function handleEmail(message: any, env: Env): Promise<void> {
   try {
     console.log('Email received via Cloudflare Email Routing');
+    console.log('Message object keys:', Object.keys(message));
 
-    // Get email metadata
+    // Get email metadata - Cloudflare Email Message format
     const from = message.from || '';
-    const subject = message.headers.get('subject') || '';
     const to = message.to || '';
+
+    // Try different ways to get subject
+    let subject = '';
+    try {
+      if (message.headers && typeof message.headers.get === 'function') {
+        subject = message.headers.get('subject') || '';
+      } else if (message.headers && message.headers.subject) {
+        subject = message.headers.subject;
+      }
+    } catch (e) {
+      console.error('Error getting subject:', e);
+    }
 
     console.log(`From: ${from}, Subject: ${subject}, To: ${to}`);
 
@@ -72,26 +57,33 @@ export async function handleEmail(message: any, env: Env): Promise<void> {
       return;
     }
 
-    // Check subject trigger/passcode
+    // Check subject for baking keywords
     if (!subjectMatches(subject, env)) {
-      console.log(`Subject doesn't match trigger/passcode: ${subject}`);
+      console.log(`Subject doesn't contain baking keywords: ${subject}`);
       return;
     }
 
-    console.log('Email passed validation, extracting image...');
+    console.log('Email passed validation, parsing email...');
 
-    // Get raw email content
-    const rawEmail = await new Response(message.raw).arrayBuffer();
+    // Parse email with postal-mime
+    const parser = new PostalMime();
+    const parsedEmail = await parser.parse(message.raw);
 
-    // Parse MIME to find image attachments
-    const imageBytes = await extractFirstImageFromEmail(rawEmail);
+    console.log(`Email has ${parsedEmail.attachments.length} attachment(s)`);
 
-    if (!imageBytes) {
+    // Find first image attachment
+    const imageAttachment = parsedEmail.attachments.find((att: any) =>
+      att.mimeType?.startsWith('image/')
+    );
+
+    if (!imageAttachment) {
       console.warn('No image attachment found in email');
       return;
     }
 
-    console.log(`Found image attachment (${imageBytes.byteLength} bytes), running OCR...`);
+    console.log(`Found image attachment: ${imageAttachment.filename} (${imageAttachment.content.byteLength} bytes), running OCR...`);
+
+    const imageBytes = imageAttachment.content;
 
     // Run OCR with Mistral
     const ocrText = await mistralOcrImageBytes(imageBytes, env.MISTRAL_API_KEY);
@@ -116,64 +108,14 @@ export async function handleEmail(message: any, env: Env): Promise<void> {
     state.bake_items = plan.slice(0, 200);
     state.bake_source = 'Email';
     state.updated_at = iso();
+    state.last_bake_time = iso(); // Track when bake items were updated
     await saveState(env.KV, state);
 
     console.log(`✓ Updated bake items from email: ${plan.length} items`);
   } catch (error) {
     console.error('Email processing failed:', error);
-    throw error;
-  }
-}
-
-// Extract first image attachment from raw email MIME
-async function extractFirstImageFromEmail(rawEmail: ArrayBuffer): Promise<ArrayBuffer | null> {
-  // Convert ArrayBuffer to string for parsing
-  const decoder = new TextDecoder('utf-8');
-  const emailText = decoder.decode(rawEmail);
-
-  // Simple MIME parser to find image attachments
-  // This is a basic implementation - for production, consider using a proper MIME parser
-
-  // Look for Content-Type: image/* boundaries
-  const imageTypeRegex = /Content-Type:\s*(image\/[a-zA-Z0-9+.-]+)/gi;
-  const matches = emailText.match(imageTypeRegex);
-
-  if (!matches) {
-    console.log('No image content-type found in email');
-    return null;
-  }
-
-  // Find base64 encoded image data
-  // Typical MIME structure:
-  // Content-Type: image/jpeg; name="photo.jpg"
-  // Content-Transfer-Encoding: base64
-  // Content-Disposition: attachment; filename="photo.jpg"
-  //
-  // [base64 data here]
-
-  const base64Regex = /Content-Transfer-Encoding:\s*base64\s*\r?\n\r?\n([A-Za-z0-9+/=\r\n]+)/gi;
-  const base64Match = base64Regex.exec(emailText);
-
-  if (!base64Match || !base64Match[1]) {
-    console.log('No base64 image data found in email');
-    return null;
-  }
-
-  try {
-    // Clean up base64 string (remove newlines and whitespace)
-    const base64Clean = base64Match[1].replace(/\s/g, '');
-
-    // Decode base64 to binary
-    const binaryString = atob(base64Clean);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    console.log(`Decoded image: ${bytes.byteLength} bytes`);
-    return bytes.buffer;
-  } catch (error) {
-    console.error('Failed to decode base64 image:', error);
-    return null;
+    console.error('Error details:', error instanceof Error ? error.stack : String(error));
+    // Don't throw - we don't want to bounce/drop emails on errors
+    // Just log and return
   }
 }

@@ -35,6 +35,7 @@ export async function loadState(kv: KVNamespace): Promise<State> {
     bake_source: '',
     updated_at: null,
     last_roast_time: null,
+    last_bake_time: null,
   };
 }
 
@@ -75,6 +76,7 @@ export async function ensureDailyReset(env: Env): Promise<void> {
     state.bake_source = '';
     state.updated_at = iso();
     state.last_roast_time = null;
+    state.last_bake_time = null;
 
     await saveState(env.KV, state);
   }
@@ -107,6 +109,35 @@ export function isDisplayMode(state: State, timezone: string): boolean {
 
   // Before 6pm, we're in roasting mode
   return false;
+}
+
+// Determine baking display mode
+// Returns: "baking" | "baked_today" | "fresh_baked"
+export function getBakingDisplayMode(state: State, timezone: string): string {
+  const localNow = nowLocal(timezone);
+  const hour = localNow.getHours();
+
+  // If we recently received new bake items (within 30 minutes), always show "Baking Now"
+  if (state.last_bake_time) {
+    const lastBake = new Date(state.last_bake_time);
+    const minutesSinceLastBake = (localNow.getTime() - lastBake.getTime()) / (1000 * 60);
+    if (minutesSinceLastBake <= 30) {
+      return 'baking';
+    }
+  }
+
+  // After 6pm: "Fresh Baked"
+  if (hour >= 18) {
+    return 'fresh_baked';
+  }
+
+  // After 2pm but before 6pm: "Baked Today"
+  if (hour >= 14) {
+    return 'baked_today';
+  }
+
+  // Before 2pm: "Baking Now"
+  return 'baking';
 }
 
 // Compute bake window index

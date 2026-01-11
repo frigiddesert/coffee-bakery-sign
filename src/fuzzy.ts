@@ -1,4 +1,4 @@
-import { extract } from 'fuzzball';
+import { extract, token_set_ratio } from 'fuzzball';
 
 // Normalize text (remove extra spaces, special characters)
 export function normalizeText(s: string): string {
@@ -38,6 +38,45 @@ export function splitCandidateLines(ocrText: string): string[] {
   return final;
 }
 
+// Clean up candidate by removing prep keywords and expanding abbreviations
+function cleanCandidate(candidate: string): string {
+  let cleaned = candidate;
+
+  // Remove common prep keywords (case-insensitive)
+  const prepKeywords = [
+    'cut', 'prep', 'make', 'bake', 'prepare', 'mix', 'finish',
+    'assemble', 'wrap', 'package', 'box', 'frost', 'fill'
+  ];
+
+  for (const keyword of prepKeywords) {
+    // Remove keyword at the start or end with word boundaries
+    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+    cleaned = cleaned.replace(regex, '');
+  }
+
+  // Expand common abbreviations
+  const abbreviations: { [key: string]: string } = {
+    'H&C': 'Ham & Cheese',
+    'h&c': 'Ham & Cheese',
+    'S&F': 'Spinach & Feta',
+    's&f': 'Spinach & Feta',
+    'B&W': 'Black & White',
+    'b&w': 'Black & White',
+    'PB': 'Peanut Butter',
+    'pb': 'Peanut Butter',
+  };
+
+  for (const [abbr, full] of Object.entries(abbreviations)) {
+    const regex = new RegExp(`\\b${abbr}\\b`, 'g');
+    cleaned = cleaned.replace(regex, full);
+  }
+
+  // Clean up extra whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  return cleaned;
+}
+
 // Fuzzy match candidates to menu using fuzzball
 export function fuzzyMatchToMenu(candidates: string[], menu: string[]): string[] {
   if (candidates.length === 0) return [];
@@ -47,8 +86,14 @@ export function fuzzyMatchToMenu(candidates: string[], menu: string[]): string[]
   const used = new Set<string>();
 
   for (const candidate of candidates) {
+    // Clean up the candidate (remove prep keywords, expand abbreviations)
+    const cleaned = cleanCandidate(candidate);
+
+    // Skip if cleaned candidate is too short or empty
+    if (!cleaned || cleaned.length < 2) continue;
+
     // Extract best match from menu
-    const results = extract(candidate, menu, { scorer: 'token_set_ratio', limit: 1 });
+    const results = extract(cleaned, menu, { scorer: token_set_ratio, limit: 1 });
 
     if (results.length === 0) continue;
 

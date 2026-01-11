@@ -34,6 +34,7 @@ export async function loadState(kv: KVNamespace): Promise<State> {
     bake_items: [],
     bake_source: '',
     updated_at: null,
+    last_roast_time: null,
   };
 }
 
@@ -73,9 +74,39 @@ export async function ensureDailyReset(env: Env): Promise<void> {
     state.bake_items = [];
     state.bake_source = '';
     state.updated_at = iso();
+    state.last_roast_time = null;
 
     await saveState(env.KV, state);
   }
+}
+
+// Determine if we're in "display mode" (Fresh Roasted) vs "roasting mode" (Roasting Now)
+export function isDisplayMode(state: State, timezone: string): boolean {
+  const localNow = nowLocal(timezone);
+  const hour = localNow.getHours();
+
+  // After 6pm, check if we've roasted recently
+  if (hour >= 18) {
+    // If no roasts today, definitely in display mode
+    if (state.roasts_today.length === 0) {
+      return false; // No roasts to display
+    }
+
+    // If we have a last_roast_time, check if it was more than 30 minutes ago
+    if (state.last_roast_time) {
+      const lastRoast = new Date(state.last_roast_time);
+      const minutesSinceLastRoast = (localNow.getTime() - lastRoast.getTime()) / (1000 * 60);
+
+      // If last roast was more than 30 minutes ago, we're in display mode
+      return minutesSinceLastRoast > 30;
+    }
+
+    // If no last_roast_time but we have roasts, we're in display mode
+    return true;
+  }
+
+  // Before 6pm, we're in roasting mode
+  return false;
 }
 
 // Compute bake window index

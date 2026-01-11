@@ -31,6 +31,7 @@ export interface State {
   bake_items: string[];
   bake_source: string;
   updated_at: string | null;
+  last_roast_time: string | null;  // Track when last roast was added
 }
 
 // Mail tracking state

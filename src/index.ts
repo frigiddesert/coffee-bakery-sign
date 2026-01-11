@@ -6,6 +6,7 @@ import {
   todayKey,
   iso,
   computeBakeWindow,
+  isDisplayMode,
 } from './state';
 import { splitCandidateLines, fuzzyMatchToMenu, loadMenuItems } from './fuzzy';
 import { mistralOcrImageBytes, normalizeImageBytes } from './ocr';
@@ -41,7 +42,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
 <body>
   <div class="wrap">
     <div class="col">
-      <div class="title">Roasting Now:</div>
+      <div class="title" id="roastTitle">Roasting Now:</div>
       <div class="current" id="roastCurrent">—</div>
       <div class="roast-previous" id="roastPrevious"></div>
     </div>
@@ -60,13 +61,34 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       try{
         const r = await fetch("/api/state", { cache: "no-store" });
         const s = await r.json();
-        document.getElementById("roastCurrent").textContent = s.roast_current || "—";
-        const prevRoasts = s.roasts_today || [];
-        const prevEl = document.getElementById("roastPrevious");
-        if (prevRoasts.length > 0) {
-          prevEl.innerHTML = prevRoasts.map(esc).map(r => \`<div>\${r}</div>\`).join('');
+
+        // Handle display mode vs roasting mode
+        const displayMode = s.display_mode || false;
+        const roastTitleEl = document.getElementById("roastTitle");
+        const roastCurrentEl = document.getElementById("roastCurrent");
+        const prevRoastsEl = document.getElementById("roastPrevious");
+
+        if (displayMode) {
+          // Display mode: Show "Fresh Roasted:" and all roasts
+          roastTitleEl.textContent = "Fresh Roasted:";
+          roastCurrentEl.style.display = "none";
+          const allRoasts = s.roasts_today || [];
+          if (allRoasts.length > 0) {
+            prevRoastsEl.innerHTML = allRoasts.map(esc).map(r => \`<div>\${r}</div>\`).join('');
+          } else {
+            prevRoastsEl.innerHTML = "";
+          }
         } else {
-          prevEl.innerHTML = "";
+          // Roasting mode: Show "Roasting Now:" and current roast
+          roastTitleEl.textContent = "Roasting Now:";
+          roastCurrentEl.style.display = "block";
+          roastCurrentEl.textContent = s.roast_current || "—";
+          const prevRoasts = s.roasts_today || [];
+          if (prevRoasts.length > 0) {
+            prevRoastsEl.innerHTML = prevRoasts.map(esc).map(r => \`<div>\${r}</div>\`).join('');
+          } else {
+            prevRoastsEl.innerHTML = "";
+          }
         }
         const bakeItems = s.bake_items || [];
         const nowEl = document.getElementById("bakeNow");
@@ -119,6 +141,7 @@ export default {
       await ensureDailyReset(env);
       const state = await loadState(env.KV);
       const bakeCurrentIndex = computeBakeWindow(state.bake_items, env);
+      const displayMode = isDisplayMode(state, env.APP_TZ);
 
       return new Response(
         JSON.stringify({
@@ -128,6 +151,7 @@ export default {
           bake_items: state.bake_items,
           bake_current_index: bakeCurrentIndex,
           updated_at: state.updated_at,
+          display_mode: displayMode, // true = "Fresh Roasted", false = "Roasting Now"
         }),
         {
           headers: { 'Content-Type': 'application/json' },
@@ -178,6 +202,7 @@ export default {
       }
 
       state.updated_at = iso();
+      state.last_roast_time = iso(); // Track when we last roasted
       await saveState(env.KV, state);
 
       return new Response(JSON.stringify({ ok: true }), {

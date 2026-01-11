@@ -27,8 +27,8 @@
             page-break-after: always;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: repeat(4, 1fr);
-            gap: 0;
+            grid-template-rows: repeat(3, 1fr);
+            gap: 0.2in;
         }
 
         .page:last-child {
@@ -36,26 +36,27 @@
         }
 
         .qr-card {
-            border: 1px solid #ddd;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 0.25in;
+            padding: 0.3in;
             text-align: center;
         }
 
         .coffee-name {
-            font-size: 24pt;
+            font-size: 26pt;
             font-weight: bold;
-            margin-bottom: 0.15in;
-            line-height: 1.2;
+            margin-bottom: 0.2in;
+            line-height: 1.1;
             color: #2B1712;
+            max-width: 100%;
+            word-wrap: break-word;
         }
 
         .qr-image {
-            width: 1.5in;
-            height: 1.5in;
+            width: 2in;
+            height: 2in;
             object-fit: contain;
         }
 
@@ -80,6 +81,10 @@
                 background: white;
                 margin: 0 auto 20px;
                 box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            }
+
+            .qr-card {
+                border: 1px dashed #ccc;
             }
         }
     </style>
@@ -110,6 +115,9 @@
         <div class="coffee-name">Colombia Decaf</div>
         <img src="qr_codes/colombia-decaf.png" alt="Colombia Decaf" class="qr-image">
     </div>
+</div>
+
+<div class="page">
     <div class="qr-card">
         <div class="coffee-name">Costa Rica</div>
         <img src="qr_codes/costa-rica.png" alt="Costa Rica" class="qr-image">
@@ -118,9 +126,6 @@
         <div class="coffee-name">Dark Roast Decaf</div>
         <img src="qr_codes/dark-roast-decaf.png" alt="Dark Roast Decaf" class="qr-image">
     </div>
-</div>
-
-<div class="page">
     <div class="qr-card">
         <div class="coffee-name">Early Winter Blend</div>
         <img src="qr_codes/early-winter-blend.png" alt="Early Winter Blend" class="qr-image">
@@ -137,6 +142,9 @@
         <div class="coffee-name">French Espresso Colombia</div>
         <img src="qr_codes/french-espresso-colombia.png" alt="French Espresso Colombia" class="qr-image">
     </div>
+</div>
+
+<div class="page">
     <div class="qr-card">
         <div class="coffee-name">French Espresso Guatemala</div>
         <img src="qr_codes/french-espresso-guatemala.png" alt="French Espresso Guatemala" class="qr-image">
@@ -153,9 +161,6 @@
         <div class="coffee-name">Honduras</div>
         <img src="qr_codes/honduras.png" alt="Honduras" class="qr-image">
     </div>
-</div>
-
-<div class="page">
     <div class="qr-card">
         <div class="coffee-name">Kenya AA</div>
         <img src="qr_codes/kenya-aa.png" alt="Kenya AA" class="qr-image">
@@ -164,6 +169,9 @@
         <div class="coffee-name">Kona 100%</div>
         <img src="qr_codes/kona-100.png" alt="Kona 100%" class="qr-image">
     </div>
+</div>
+
+<div class="page">
     <div class="qr-card">
         <div class="coffee-name">Mexico</div>
         <img src="qr_codes/mexico.png" alt="Mexico" class="qr-image">
@@ -215,8 +223,6 @@
         <div class="coffee-name">Village Blend</div>
         <img src="qr_codes/village.png" alt="Village Blend" class="qr-image">
     </div>
-    <div class="qr-card"></div>
-    <div class="qr-card"></div>
 </div>
 
 </body>

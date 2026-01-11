@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Create print-ready HTML sheets with QR codes (8-up per page)
-Layout: 2 columns x 4 rows on 8.5x11" paper with 0.5" margins
+Create print-ready HTML sheets with QR codes (6-up per page)
+Layout: 2 columns x 3 rows on 8.5x11" paper with 0.5" margins
 """
 import os
 from pathlib import Path
@@ -69,8 +69,8 @@ html = """<!DOCTYPE html>
             page-break-after: always;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: repeat(4, 1fr);
-            gap: 0;
+            grid-template-rows: repeat(3, 1fr);
+            gap: 0.2in;
         }
 
         .page:last-child {
@@ -78,26 +78,27 @@ html = """<!DOCTYPE html>
         }
 
         .qr-card {
-            border: 1px solid #ddd;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 0.25in;
+            padding: 0.3in;
             text-align: center;
         }
 
         .coffee-name {
-            font-size: 24pt;
+            font-size: 26pt;
             font-weight: bold;
-            margin-bottom: 0.15in;
-            line-height: 1.2;
+            margin-bottom: 0.2in;
+            line-height: 1.1;
             color: #2B1712;
+            max-width: 100%;
+            word-wrap: break-word;
         }
 
         .qr-image {
-            width: 1.5in;
-            height: 1.5in;
+            width: 2in;
+            height: 2in;
             object-fit: contain;
         }
 
@@ -123,14 +124,18 @@ html = """<!DOCTYPE html>
                 margin: 0 auto 20px;
                 box-shadow: 0 0 10px rgba(0,0,0,0.2);
             }
+
+            .qr-card {
+                border: 1px dashed #ccc;
+            }
         }
     </style>
 </head>
 <body>
 """
 
-# Group coffees into pages of 8
-pages = [coffees[i:i+8] for i in range(0, len(coffees), 8)]
+# Group coffees into pages of 6
+pages = [coffees[i:i+6] for i in range(0, len(coffees), 6)]
 
 for page_num, page_coffees in enumerate(pages):
     html += f'<div class="page">\n'
@@ -143,7 +148,7 @@ for page_num, page_coffees in enumerate(pages):
 '''
 
     # Fill remaining slots with empty cards if needed
-    remaining = 8 - len(page_coffees)
+    remaining = 6 - len(page_coffees)
     for _ in range(remaining):
         html += '    <div class="qr-card"></div>\n'
 
@@ -160,6 +165,7 @@ with open(output_file, 'w') as f:
 
 print(f"✓ Created print-ready HTML: {output_file}")
 print(f"  {len(pages)} pages total ({len(coffees)} QR codes)")
+print(f"  Layout: 2 columns × 3 rows (6-up per page)")
 print("")
 print("To print:")
 print("  1. Open qr_print_sheets.html in your browser")

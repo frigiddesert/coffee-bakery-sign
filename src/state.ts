@@ -87,17 +87,19 @@ export function isDisplayMode(state: State, timezone: string): boolean {
   const localNow = nowLocal(timezone);
   const hour = localNow.getHours();
 
-  // After 6pm, check if we've roasted recently
-  if (hour >= 18) {
-    // If no roasts today, definitely in display mode
+  // After 2pm (roasting typically done by then), check if we've roasted recently
+  if (hour >= 14) {
+    // If no roasts today, not in display mode (nothing to display)
     if (state.roasts_today.length === 0) {
-      return false; // No roasts to display
+      return false;
     }
 
     // If we have a last_roast_time, check if it was more than 30 minutes ago
     if (state.last_roast_time) {
       const lastRoast = new Date(state.last_roast_time);
-      const minutesSinceLastRoast = (localNow.getTime() - lastRoast.getTime()) / (1000 * 60);
+      // Use actual current UTC time for comparison (not the formatted local time)
+      const nowUtc = Date.now();
+      const minutesSinceLastRoast = (nowUtc - lastRoast.getTime()) / (1000 * 60);
 
       // If last roast was more than 30 minutes ago, we're in display mode
       return minutesSinceLastRoast > 30;
@@ -107,7 +109,7 @@ export function isDisplayMode(state: State, timezone: string): boolean {
     return true;
   }
 
-  // Before 6pm, we're in roasting mode
+  // Before 2pm, we're in roasting mode
   return false;
 }
 
@@ -120,7 +122,9 @@ export function getBakingDisplayMode(state: State, timezone: string): string {
   // If we recently received new bake items (within 30 minutes), always show "Baking Now"
   if (state.last_bake_time) {
     const lastBake = new Date(state.last_bake_time);
-    const minutesSinceLastBake = (localNow.getTime() - lastBake.getTime()) / (1000 * 60);
+    // Use actual current UTC time for comparison
+    const nowUtc = Date.now();
+    const minutesSinceLastBake = (nowUtc - lastBake.getTime()) / (1000 * 60);
     if (minutesSinceLastBake <= 30) {
       return 'baking';
     }

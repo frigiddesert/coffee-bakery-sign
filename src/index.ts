@@ -19,6 +19,10 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="300" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Village Roaster Display</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Raleway:wght@400;500;600;700;800;900&display=swap" />
   <style>
@@ -50,14 +54,44 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
     <div class="col">
       <div class="title" id="bakeTitle">Baking Now:</div>
       <div class="bake-now-list" id="bakeNow">—</div>
-      <div class="subline">Coming Up Soon:</div>
+      <div class="subline" id="soonHeader">Coming Up Soon:</div>
       <div class="coming-soon" id="bakeSoon">—</div>
+      <div class="subline" id="freshHeader" style="margin-top: 2.5vw;">Fresh Baked:</div>
+      <div class="coming-soon" id="bakeFresh">—</div>
     </div>
   </div>
   <div class="divider"></div>
   <script>
     const POLL_SECONDS = {{POLL_SECONDS}} || 10;
-    function esc(s){return (s ?? "").toString().replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");}
+    // Only escape < and > to prevent HTML injection, leave & as-is for proper display
+    function esc(s){return (s ?? "").toString().replaceAll("<","&lt;").replaceAll(">","&gt;");}
+
+    // Dynamically adjust font size for current roast based on text length
+    function adjustRoastFontSize(element, text) {
+      if (!text || text === "—") {
+        element.style.fontSize = "";
+        return;
+      }
+
+      const length = text.length;
+      let fontSize;
+
+      // Adjust font size based on character count
+      if (length <= 15) {
+        fontSize = "clamp(82px, 9.3vw, 180px)"; // Original size
+      } else if (length <= 20) {
+        fontSize = "clamp(70px, 8vw, 150px)";
+      } else if (length <= 25) {
+        fontSize = "clamp(60px, 7vw, 130px)";
+      } else if (length <= 30) {
+        fontSize = "clamp(50px, 6vw, 110px)";
+      } else {
+        fontSize = "clamp(45px, 5.5vw, 100px)";
+      }
+
+      element.style.fontSize = fontSize;
+    }
+
     async function tick(){
       try{
         const r = await fetch("/api/state", { cache: "no-store" });
@@ -83,7 +117,9 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
           // Roasting mode: Show "Roasting Now:" and current roast
           roastTitleEl.textContent = "Roasting Now:";
           roastCurrentEl.style.display = "block";
-          roastCurrentEl.textContent = s.roast_current || "—";
+          const currentRoast = s.roast_current || "—";
+          roastCurrentEl.textContent = currentRoast;
+          adjustRoastFontSize(roastCurrentEl, currentRoast);
           const prevRoasts = s.roasts_today || [];
           if (prevRoasts.length > 0) {
             prevRoastsEl.innerHTML = prevRoasts.map(esc).map(r => \`<div>\${r}</div>\`).join('');
@@ -99,6 +135,9 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         const bakeCurrentIndex = s.bake_current_index || 0;
         const nowEl = document.getElementById("bakeNow");
         const soonEl = document.getElementById("bakeSoon");
+        const freshEl = document.getElementById("bakeFresh");
+        const soonHeader = document.getElementById("soonHeader");
+        const freshHeader = document.getElementById("freshHeader");
 
         // Set title based on baking mode
         if (bakingMode === 'fresh_baked') {
@@ -112,20 +151,58 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         if (bakeItems.length === 0) {
           nowEl.textContent = "—";
           soonEl.textContent = "—";
+          freshEl.textContent = "—";
+          soonHeader.style.display = "block";
+          freshHeader.style.display = "block";
+        } else if (bakingMode === 'baked_today' || bakingMode === 'fresh_baked') {
+          // End of day mode: show all items in one larger list
+          soonHeader.style.display = "none";
+          soonEl.style.display = "none";
+          freshHeader.style.display = "none";
+          freshEl.style.display = "none";
+
+          // Show all items in the main list with larger font
+          nowEl.style.fontSize = "clamp(28px, 3.5vw, 50px)";
+          nowEl.innerHTML = bakeItems.map(esc).map(item => \`<div>\${item}</div>\`).join('');
         } else {
-          // Use bake_current_index to pace items through the shift
-          const currentItems = bakeItems.slice(bakeCurrentIndex, bakeCurrentIndex + 3).map(esc);
+          // Active baking mode: show sections
+          soonHeader.style.display = "block";
+          soonEl.style.display = "block";
+          freshHeader.style.display = "block";
+          freshEl.style.display = "block";
+          nowEl.style.fontSize = "";
+
+          // Always show at least 1 item in "Baking Now", 2+ in "Coming Up Soon" if available
+          let adjustedIndex = bakeCurrentIndex;
+          const remainingAfterCurrent = bakeItems.length - adjustedIndex - 1;
+
+          // If we don't have at least 2 items after current, adjust index back
+          if (remainingAfterCurrent < 2 && adjustedIndex > 0) {
+            adjustedIndex = Math.max(0, bakeItems.length - 3);
+          }
+
+          // Baking Now: show current item
+          const currentItems = bakeItems.slice(adjustedIndex, adjustedIndex + 1).map(esc);
           if (currentItems.length > 0) {
             nowEl.innerHTML = currentItems.map(item => \`<div>\${item}</div>\`).join('');
           } else {
             nowEl.textContent = "—";
           }
 
-          const remainingItems = bakeItems.slice(bakeCurrentIndex + 3).map(esc);
-          if (remainingItems.length > 0) {
-            soonEl.textContent = remainingItems.join(", ");
+          // Coming Up Soon: show next 2+ items
+          const upcomingItems = bakeItems.slice(adjustedIndex + 1).map(esc);
+          if (upcomingItems.length > 0) {
+            soonEl.textContent = upcomingItems.join(", ");
           } else {
             soonEl.textContent = "—";
+          }
+
+          // Fresh Baked: show items that have already been displayed
+          const completedItems = bakeItems.slice(0, adjustedIndex).map(esc);
+          if (completedItems.length > 0) {
+            freshEl.textContent = completedItems.join(", ");
+          } else {
+            freshEl.textContent = "—";
           }
         }
       }catch(_e){}
@@ -149,7 +226,12 @@ export default {
         env.STATE_POLL_SECONDS || '10'
       );
       return new Response(html, {
-        headers: { 'Content-Type': 'text/html' },
+        headers: {
+          'Content-Type': 'text/html',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
     }
 

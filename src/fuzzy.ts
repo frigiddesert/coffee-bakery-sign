@@ -98,7 +98,15 @@ export function fuzzyMatchToMenu(candidates: string[], menu: string[]): string[]
     if (results.length === 0) continue;
 
     const [bestMatch, score] = results[0];
-    if (score < 80) continue;
+
+    // Log the match for debugging
+    console.log(`Candidate: "${candidate}" -> Cleaned: "${cleaned}" -> Match: "${bestMatch}" (score: ${score})`);
+
+    // Require high confidence match (90+ score)
+    if (score < 90) {
+      console.log(`  ✗ Rejected (score too low)`);
+      continue;
+    }
 
     const key = bestMatch.toLowerCase();
     if (used.has(key)) continue;

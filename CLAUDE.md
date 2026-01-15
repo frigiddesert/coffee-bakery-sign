@@ -77,12 +77,12 @@ The Worker exports three handlers in `src/index.ts`:
 - **KV Namespace ID:** `35352ae010ec4a6792aedc0d37a426b6` (in wrangler.toml)
 
 ### Email Processing Flow
-1. Email sent to `baking@sandland.us` (configured in Cloudflare Dashboard)
+1. Email sent to `baking-lccbohfpluk03etuh1via7@sandland.us` (configured in Cloudflare Dashboard)
 2. Cloudflare Email Routing triggers `email()` handler
-3. `src/email-handler.ts` extracts image from MIME
-4. Validates sender allowlist and subject trigger/passcode
+3. `src/email-handler.ts` uses `postal-mime` library to parse email and extract image attachment
+4. Validates sender allowlist and subject keywords (bakeplan, bake plan, baking plan, baking)
 5. Calls Mistral Vision API for OCR (`src/ocr.ts`)
-6. Fuzzy matches extracted text to menu (`src/fuzzy.ts` using fuzzball library)
+6. Fuzzy matches extracted text to menu (`src/fuzzy.ts` using fuzzball library with 90% threshold)
 7. Updates KV state via `src/state.ts`
 
 **Critical:** Email processing is **push-based** (instant), not polling. The cron job only handles daily resets.
@@ -99,7 +99,9 @@ The Worker exports three handlers in `src/index.ts`:
 The display is a **single HTML page** (no build step) embedded in `src/index.ts` as `HTML_TEMPLATE`:
 - Two-column layout: Roasting (left) | Baking (right)
 - Polls `/api/state` every 10 seconds
-- Auto-calculates "Baking Now" (first 3) vs "Coming Up Soon" (rest)
+- Auto-refreshes entire page every 5 minutes (for code updates on remote displays)
+- Dynamic font sizing for long coffee names (adjusts based on character count)
+- Time-based display modes with consolidated views after business hours
 - Responsive: stacks to single column on mobile
 
 ## Key Implementation Details
@@ -122,8 +124,24 @@ todayKey(timezone: string): string // YYYY-MM-DD in TZ
 `src/fuzzy.ts` uses the `fuzzball` library (JavaScript port of Python's fuzzywuzzy):
 - Normalizes OCR text (removes special chars, extra spaces)
 - Splits on delimiters (commas, pipes, slashes)
-- Fuzzy matches to `MENU_ITEMS` with 80% threshold
+- **Cleans candidates** by removing prep keywords (cut, prep, make, bake, etc.)
+- **Expands abbreviations** (H&C → Ham & Cheese, S&F → Spinach & Feta, PB → Peanut Butter)
+- Fuzzy matches to `MENU_ITEMS` with **90% threshold** (high confidence required)
 - Deduplicates results
+
+### Display Mode Logic
+Time-based title transitions (all times America/Denver):
+
+**Roasting (left column):**
+- Before 2pm or within 30min of QR scan: **"Roasting Now:"** with current roast highlighted
+- After 2pm (and >30min since last scan): **"Fresh Roasted:"** listing all roasts
+
+**Baking (right column):**
+- Before 2pm or within 30min of new photo: **"Baking Now:"** with sections (Coming Up Soon, Fresh Baked)
+- 2pm-6pm: **"Baked Today:"** consolidated single list with larger font
+- After 6pm: **"Fresh Baked:"** consolidated single list
+
+State tracks `last_roast_time` and `last_bake_time` for the 30-minute grace period.
 
 ### OCR Processing
 `src/ocr.ts` calls Mistral Vision API:
@@ -147,39 +165,39 @@ See `EMAIL_ROUTING_SETUP.md` for detailed steps.
 
 ## Working with KV Storage
 
+**Important:** Use `--remote` flag for production KV operations.
+
 ```bash
 # List all keys in namespace
-npx wrangler kv key list --namespace-id=35352ae010ec4a6792aedc0d37a426b6
+npx wrangler kv key list --namespace-id=35352ae010ec4a6792aedc0d37a426b6 --remote
 
 # Get a specific key
-npx wrangler kv key get STATE --namespace-id=35352ae010ec4a6792aedc0d37a426b6
+npx wrangler kv key get STATE --namespace-id=35352ae010ec4a6792aedc0d37a426b6 --remote
 
-# Put a key (testing)
-npx wrangler kv key put STATE '{"date":"2026-01-10",...}' --namespace-id=35352ae010ec4a6792aedc0d37a426b6
+# Put a key (testing/manual state update)
+npx wrangler kv key put STATE '{"date":"2026-01-10",...}' --namespace-id=35352ae010ec4a6792aedc0d37a426b6 --remote
 
 # Delete a key
-npx wrangler kv key delete STATE --namespace-id=35352ae010ec4a6792aedc0d37a426b6
+npx wrangler kv key delete STATE --namespace-id=35352ae010ec4a6792aedc0d37a426b6 --remote
 ```
 
 ## QR Code Generation
 
-Python scripts in `python-legacy/` generate QR codes:
+Python scripts generate QR codes (use `uvx` to run without installing dependencies):
 
 ```bash
 # Roast update QR (hits /api/roast?item=Name)
-python python-legacy/generate_roast_qr.py \
-  --base-url https://village-roaster-sign.workers.dev \
+uvx --from qrcode --with Pillow python3 python-legacy/generate_roast_qr.py \
+  --base-url https://village-roaster-sign.eric-c5f.workers.dev \
   --roast "Honduras" \
-  --output qr_honduras.png
+  --output qr_codes/honduras.png
 
 # Email QR (opens mail client with pre-filled email)
-python python-legacy/generate_mailto_qr.py \
-  --email baking@sandland.us \
-  --subject "BAKEPLAN BAKE2025" \
-  --output mailto_baking_qr.png
+# See generate_email_qr.py for mailto link generation
+uvx --from qrcode --with Pillow python3 generate_email_qr.py
 ```
 
-Requires: `pip install qrcode[pil]`
+QR codes are saved to `qr_codes/` directory (gitignored).
 
 ## Deployment Checklist
 

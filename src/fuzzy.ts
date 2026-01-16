@@ -42,10 +42,11 @@ export function splitCandidateLines(ocrText: string): string[] {
 function cleanCandidate(candidate: string): string {
   let cleaned = candidate;
 
-  // Remove common prep keywords (case-insensitive)
+  // Remove common prep keywords and quantity modifiers (case-insensitive)
   const prepKeywords = [
     'cut', 'prep', 'make', 'bake', 'prepare', 'mix', 'finish',
-    'assemble', 'wrap', 'package', 'box', 'frost', 'fill'
+    'assemble', 'wrap', 'package', 'box', 'frost', 'fill',
+    'half', 'whole', 'full', 'double', 'single', 'extra'
   ];
 
   for (const keyword of prepKeywords) {
